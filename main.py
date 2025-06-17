@@ -54,11 +54,11 @@ class RealTimeAlertMonitor:
         beiter_patterns = [
             "ביתר עילית",
             "ביתר-עילית", 
-            "בית״ר עילית",
-            "בית"ר עילית"
+            "ביתר עיליות",
+            "beitar illit"
         ]
         
-        return any(pattern in data for pattern in beiter_patterns)
+        return any(pattern in data.lower() for pattern in beiter_patterns)
     
     def check_new_alert(self, alerts):
         """בודק התראות חדשות לביתר עילית"""

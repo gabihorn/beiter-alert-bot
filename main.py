@@ -3,17 +3,30 @@ import time
 import json
 import logging
 import os
+import threading
 from datetime import datetime
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # הגדרות מ-Environment Variables
 WEBHOOK_URL = os.getenv('WEBHOOK_URL')
 CHECK_INTERVAL = 10  # 10 שניות
+PORT = int(os.getenv('PORT', 10000))
 
 # הגדרת לוגים
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
+
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain')
+        self.end_headers()
+        self.wfile.write(b'Beiter Alert Bot is running!')
+    
+    def log_message(self, format, *args):
+        return  # השתק לוגי HTTP
 
 class RealTimeAlertMonitor:
     def __init__(self):
@@ -40,11 +53,13 @@ class RealTimeAlertMonitor:
                 if response.status_code == 200:
                     data = response.json()
                     if data:
+                        logging.info(f"נמצאו {len(data)} התראות")
                         return data
             except Exception as e:
                 logging.warning(f"שגיאה ב-{url}: {e}")
                 continue
         
+        logging.info("אין התראות כרגע")
         return []
     
     def is_beiter_alert(self, alert):
@@ -119,10 +134,24 @@ class RealTimeAlertMonitor:
                 logging.error(f"שגיאה: {e}")
                 time.sleep(30)
 
-if __name__ == "__main__":
+def start_health_server():
+    """מפעיל HTTP server בשביל Render"""
+    server = HTTPServer(('0.0.0.0', PORT), HealthHandler)
+    logging.info(f"🌐 HTTP server מופעל על port {PORT}")
+    server.serve_forever()
+
+def main():
     if not WEBHOOK_URL:
-        print("❌ חובה להגדיר WEBHOOK_URL!")
-        exit(1)
+        logging.error("❌ חובה להגדיר WEBHOOK_URL!")
+        return
     
+    # הפעלת HTTP server ברקע
+    health_thread = threading.Thread(target=start_health_server, daemon=True)
+    health_thread.start()
+    
+    # הפעלת מעקב ההתראות
     monitor = RealTimeAlertMonitor()
     monitor.run()
+
+if __name__ == "__main__":
+    main()
